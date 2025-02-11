@@ -6,6 +6,8 @@
 	import { DarkMode, Button } from "flowbite-svelte";
 	import { GithubSolid } from "flowbite-svelte-icons";
 
+	const { children } = $props()
+
 	const btnClass = "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg text-xl p-2 h-[40px] w-[40px] flex items-center justify-center border-none";
 </script>
 
@@ -24,5 +26,5 @@
 	</div>
 </div>
 <div class="h-[calc(100vh-75px)]">
-	<slot/>
+	{@render children?.()}
 </div>

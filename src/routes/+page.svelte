@@ -6,13 +6,14 @@
 	import { Button, Input, NumberInput, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
 	import { CloseCircleSolid, InfoCircleSolid } from "flowbite-svelte-icons";
 
-	let metals: Metal[] = $settings.metals;
-	let ores: Ore[] = $settings.ores;
-	let params: Params = $settings.params;
+	let metals: Metal[] = $state($settings.metals);
+	let ores: Ore[] = $state($settings.ores);
+	let params: Params = $state($settings.params);
 
-	$: params, metals, ores, settings.set({ metals, ores, params });
+	// $: params, metals, ores, settings.set({ metals, ores, params });
+	$effect(() => settings.set({ metals, ores, params }))
 
-	let result: Result | null = null;
+	let result: Result | null = $state(null);
 
 	const calculate = () =>
 		result = generateAlloyCombinations(metals, ores, params);
