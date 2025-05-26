@@ -21,7 +21,7 @@ jobs:
 
       - name: build
         env:
-          PUBLIC_GITHUB: ${{ github.event.repository.url }}
+          PUBLIC_GITHUB: ${{ github.event.repository.html_url }}
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
           yarn build
