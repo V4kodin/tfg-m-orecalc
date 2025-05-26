@@ -3,7 +3,7 @@
 	import { settings } from "$lib/stores";
 	import { generateAlloyCombinations } from "$lib/math";
 
-	import { Button, Input, NumberInput, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
+	import { Button, Input, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
 	import { CloseCircleSolid, InfoCircleSolid } from "flowbite-svelte-icons";
 
 	let metals: Metal[] = $state($settings.metals);
@@ -27,7 +27,7 @@
 			<div class="flex w-full flex-col gap-2">
 				<Label>Multiple of</Label>
 				<div class="flex flex-row gap-2 items-center">
-					<NumberInput bind:value={params.multipleOf} />
+					<Input type="number" bind:value={params.multipleOf} />
 					<Label>mB</Label>
 				</div>
 			</div>
@@ -38,11 +38,11 @@
 			<div class="flex w-full flex-row gap-2">
 				<div class="flex w-full flex-col gap-2">
 					<Label>Min mB</Label>
-					<NumberInput bind:value={params.min} />
+					<Input type="number" bind:value={params.min} />
 				</div>
 				<div class="flex w-full flex-col gap-2">
 					<Label>Max mB</Label>
-					<NumberInput bind:value={params.max} />
+					<Input type="number" bind:value={params.max} />
 				</div>
 			</div>
 		</div>
@@ -51,7 +51,7 @@
 	
 		<div class="flex w-full flex-col gap-4">
 			<Button
-				on:click={() => metals = [...metals, { id: "", percent: { min: 0, max: 100 - metals.reduce((a, b) => a + b.percent.min, 0) } }]}
+				onclick={() => metals = [...metals, { id: "", percent: { min: 0, max: 100 - metals.reduce((a, b) => a + b.percent.min, 0) } }]}
 			>
 				Add
 			</Button>
@@ -62,7 +62,7 @@
 						<Input type="text" placeholder="Name" bind:value={metal.id} />
 						<Button
 							color="red"
-							on:click={() => metals = metals.filter(r => r !== metal)}
+							onclick={() => metals = metals.filter(r => r !== metal)}
 						><CloseCircleSolid/></Button>
 					</div>
 					<div class="flex flex-col gap-2">
@@ -82,7 +82,7 @@
 
 		<div class="flex w-full flex-col gap-4">
 			<Button
-				on:click={() => ores = [...ores, { name: "", id: "", weight: 0, quantity: 0 }]}
+				onclick={() => ores = [...ores, { name: "", id: "", weight: 0, quantity: 0 }]}
 			>
 				Add
 			</Button>
@@ -93,16 +93,16 @@
 						<Input type="text" placeholder="Name" bind:value={ore.name} />
 						<Button
 							color="red"
-							on:click={() => ores = ores.filter(r => r !== ore)}
+							onclick={() => ores = ores.filter(r => r !== ore)}
 						><CloseCircleSolid/></Button>
 					</div>
 					<div class="flex flex-row gap-2 items-center">
 						<Label class="text-sm text-nowrap">Quantity (optional)</Label>
-						<NumberInput bind:value={ore.quantity} />
+						<Input type="number" bind:value={ore.quantity} />
 						{#if ore.quantity}
 							<Button
 								color="alternative"
-								on:click={() => ore.quantity = 0}
+								onclick={() => ore.quantity = 0}
 							><CloseCircleSolid/></Button>
 						{/if}
 					</div>
@@ -116,7 +116,7 @@
 							placeholder="Select containing component"
 						></Select>
 						<div class="flex flex-row gap-2 items-center">
-							<NumberInput bind:value={ore.weight} />
+							<Input type="number" bind:value={ore.weight} />
 							<Label>mB</Label>
 						</div>
 					</div>
@@ -137,7 +137,7 @@
 				<Label>Timeout: {params.timeout} seconds</Label>
 				<Range bind:value={params.timeout} min={5} max={30} step={1}/>
 			</div>
-			<Button on:click={calculate}>Calculate</Button>
+			<Button onclick={calculate}>Calculate</Button>
 		</div>
 
 		{#if result !== null}
@@ -166,7 +166,7 @@
 									<TableHeadCell>mB</TableHeadCell>
 									<TableHeadCell>Percent</TableHeadCell>
 								</TableHead>
-								<TableBody tableBodyClass="divide-y">
+								<TableBody>
 									{#each combination.details as ore}
 										<TableBodyRow>
 											<TableBodyCell>{ore.name}</TableBodyCell>

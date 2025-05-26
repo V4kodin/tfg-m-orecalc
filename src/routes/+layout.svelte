@@ -8,7 +8,7 @@
 
 	const { children } = $props()
 
-	const btnClass = "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg text-xl p-2 h-[40px] w-[40px] flex items-center justify-center border-none";
+	const btnClass = "text-center font-medium bg-transparent border border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus-within:text-primary-700 dark:focus-within:text-white focus-within:ring-gray-200 dark:focus-within:ring-gray-700 focus-within:ring-4 focus-within:outline-hidden text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg text-xl p-2 h-[40px] w-[40px] flex items-center justify-center border-none";
 </script>
 
 <svelte:head>
@@ -22,7 +22,7 @@
 		{#if PUBLIC_GITHUB}
 			<Button class={btnClass} href={PUBLIC_GITHUB} target="_blank" color="alternative"><GithubSolid /></Button>
 		{/if}
-		<DarkMode {btnClass}/>
+		<DarkMode class={btnClass}/>
 	</div>
 </div>
 <div class="h-[calc(100vh-75px)]">
