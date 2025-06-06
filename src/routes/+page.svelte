@@ -4,7 +4,7 @@
 	import { generateAlloyCombinations } from "$lib/math";
 
 	import { Button, Input, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
-	import { TrashBinSolid, InfoCircleSolid } from "flowbite-svelte-icons";
+	import { TrashBinSolid, InfoCircleSolid, CloseCircleSolid } from "flowbite-svelte-icons";
 
 	let settings = $state($settingsStore);
 	$effect(() => settingsStore.set(settings));
@@ -110,7 +110,7 @@
 							<Button
 								color="alternative"
 								onclick={() => ore.quantity = 0}
-							><TrashBinSolid/></Button>
+							><CloseCircleSolid/></Button>
 						{/if}
 					</div>
 
