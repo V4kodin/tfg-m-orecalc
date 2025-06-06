@@ -55,3 +55,10 @@ export interface Preset {
 	ores: Ore[];
 	params: Params;
 }
+
+export interface ToastProps {
+	status: boolean;
+	clipboard: boolean;
+	fail: boolean;
+	message: string;
+}

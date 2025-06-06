@@ -7,7 +7,7 @@
 	import { GithubSolid, TrashBinSolid, ClipboardCheckSolid, CheckCircleSolid, CloseCircleSolid } from "flowbite-svelte-icons";
 
 	import { preset, saved, settings } from "$lib/stores";
-	import type { Preset } from "$lib/interfaces";
+	import type { Preset, ToastProps } from "$lib/interfaces";
 	
 	const { children } = $props()
 
@@ -46,21 +46,25 @@
 		}
 	}
 
-	let toastStatus = $state(false);
-	let toastProps = $state({
-		timeout: 0,
-		clipboard: false,
-		fail: false,
-		message: "",
-	});
+	let toasts: ToastProps[] = $state([]);
 
 	const showToast  = (message: string, props: { clipboard?: boolean, fail?: boolean } = {}) => {
 		const { clipboard = false, fail = false } = props;
 
-		clearTimeout(toastProps.timeout);
+		const toast = $state({ message, clipboard, fail, status: false }) as ToastProps;
 
-		toastProps = { message, clipboard, fail, timeout: setTimeout(() => toastStatus = false, 2500) };
-		toastStatus = true;
+		toasts = [...toasts, toast];
+
+		// WHYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+
+		setTimeout(() => toast.status = true, 1);
+		setTimeout(() => {
+			toast.status = false;
+
+			setTimeout(() => {
+				toasts = toasts.filter(t => t !== toast);
+			}, 250);
+		}, 2500);
 	}
 
 	const copyToClipboard = (text: string) => {
@@ -149,15 +153,19 @@
 	{@render children?.()}
 </div>
 
-<Toast position="bottom-right" bind:toastStatus>
-	{#snippet icon()}
-		{#if toastProps.fail}
-			<CloseCircleSolid class="h-5 w-5" />
-		{:else if toastProps.clipboard}
-			<ClipboardCheckSolid class="h-5 w-5"/>
-		{:else}
-			<CheckCircleSolid class="h-5 w-5" />
-		{/if}
-	{/snippet}
-	{toastProps.message}
-</Toast>
+<div class="fixed bottom-0 right-0 p-4 flex flex-col gap-2">
+	{#each toasts as toast}
+		<Toast bind:toastStatus={toast.status}>
+			{#snippet icon()}
+				{#if toast.fail}
+					<CloseCircleSolid class="h-5 w-5" />
+				{:else if toast.clipboard}
+					<ClipboardCheckSolid class="h-5 w-5"/>
+				{:else}
+					<CheckCircleSolid class="h-5 w-5" />
+				{/if}
+			{/snippet}
+			{toast.message}
+		</Toast>
+	{/each}
+</div>
