@@ -1,22 +1,29 @@
 <script lang="ts">
-	import type { Metal, Ore, Params, Result } from "$lib/interfaces";
-	import { settings } from "$lib/stores";
+	import type { Metal, Ore, Params, Result, Settings } from "$lib/interfaces";
+	import { preset, settings as settingsStore } from "$lib/stores";
 	import { generateAlloyCombinations } from "$lib/math";
 
 	import { Button, Input, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
-	import { CloseCircleSolid, InfoCircleSolid } from "flowbite-svelte-icons";
+	import { TrashBinSolid, InfoCircleSolid } from "flowbite-svelte-icons";
 
-	let metals: Metal[] = $state($settings.metals);
-	let ores: Ore[] = $state($settings.ores);
-	let params: Params = $state($settings.params);
+	let settings = $state($settingsStore);
+	$effect(() => settingsStore.set(settings));
 
-	// $: params, metals, ores, settings.set({ metals, ores, params });
-	$effect(() => settings.set({ metals, ores, params }))
+	let metals: Metal[] = $state($preset.metals);
+	let ores: Ore[] = $state($preset.ores);
+	let params: Params = $state($preset.params);
+	$effect(() => preset.set({ metals, ores, params }));
+
+	preset.subscribe(p => {
+		metals = p.metals;
+		ores = p.ores;
+		params = p.params;
+	});
 
 	let result: Result | null = $state(null);
 
 	const calculate = () =>
-		result = generateAlloyCombinations(metals, ores, params);
+		result = generateAlloyCombinations(metals, ores, params, settings);
 </script>
 
 <div class="grid grid-cols-3 divide-x h-full">
@@ -63,7 +70,7 @@
 						<Button
 							color="red"
 							onclick={() => metals = metals.filter(r => r !== metal)}
-						><CloseCircleSolid/></Button>
+						><TrashBinSolid/></Button>
 					</div>
 					<div class="flex flex-col gap-2">
 						<Label>Min: {metal.percent.min}%</Label>
@@ -94,7 +101,7 @@
 						<Button
 							color="red"
 							onclick={() => ores = ores.filter(r => r !== ore)}
-						><CloseCircleSolid/></Button>
+						><TrashBinSolid/></Button>
 					</div>
 					<div class="flex flex-row gap-2 items-center">
 						<Label class="text-sm text-nowrap">Quantity (optional)</Label>
@@ -103,7 +110,7 @@
 							<Button
 								color="alternative"
 								onclick={() => ore.quantity = 0}
-							><CloseCircleSolid/></Button>
+							><TrashBinSolid/></Button>
 						{/if}
 					</div>
 
@@ -130,12 +137,12 @@
 		
 		<div class="flex w-full flex-col gap-4">
 			<div class="flex w-full flex-col gap-2">
-				<Label>Limit: {params.count} combination{params.count > 1 ? "s" : ""}</Label>
-				<Range bind:value={params.count} min={1} max={100} step={1}/>
+				<Label>Limit: {settings.count} combination{settings.count > 1 ? "s" : ""}</Label>
+				<Range bind:value={settings.count} min={1} max={100} step={1}/>
 			</div>
 			<div class="flex w-full flex-col gap-2">
-				<Label>Timeout: {params.timeout} seconds</Label>
-				<Range bind:value={params.timeout} min={5} max={30} step={1}/>
+				<Label>Timeout: {settings.timeout} seconds</Label>
+				<Range bind:value={settings.timeout} min={5} max={30} step={1}/>
 			</div>
 			<Button onclick={calculate}>Calculate</Button>
 		</div>

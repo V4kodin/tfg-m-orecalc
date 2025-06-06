@@ -1,7 +1,7 @@
 import { persisted } from "svelte-persisted-store"
-import type { Metal, Ore, Params } from "./interfaces"
+import type { Preset, Settings } from "./interfaces"
 
-export const settings = persisted<{ metals: Metal[]; ores: Ore[]; params: Params }>("settings", {
+export const preset = persisted<Preset>("preset", {
 	metals: [
 		{
 			id: "",
@@ -22,9 +22,14 @@ export const settings = persisted<{ metals: Metal[]; ores: Ore[]; params: Params
 	params: {
 		multipleOf: 144,
 		tolerance: 30,
-		count: 5,
-		timeout: 10,
 		min: 144,
 		max: 1440
 	}
-})
+});
+
+export const settings = persisted<Settings>("settings", {
+	count: 10,
+	timeout: 5
+});
+
+export const saved = persisted<Partial<Record<string, Preset>>>("saved", {});
