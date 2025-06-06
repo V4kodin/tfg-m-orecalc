@@ -1,4 +1,4 @@
-import type { Combination, Metal, Ore, OreInfo, Params, Result } from "./interfaces"
+import type { Combination, Metal, Ore, OreInfo, Params, Result, Settings } from "./interfaces"
 
 function* product<T>(...pools: T[][]): Iterable<T[]> {
     const head = pools[0];
@@ -9,8 +9,9 @@ function* product<T>(...pools: T[][]): Iterable<T[]> {
 			yield [h, ...r];
 }
 
-export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: Params): Result {
-	const { multipleOf, tolerance, min, max, count, timeout } = params;
+export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: Params, settings: Settings): Result {
+	const { multipleOf, tolerance, min, max } = params;
+	const { count, timeout } = settings;
 
 	const validCombinations: Combination[] = [];
 	const approximationCombinations: Combination[] = [];

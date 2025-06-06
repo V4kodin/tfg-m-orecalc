@@ -1,3 +1,8 @@
+export interface Settings {
+	count: number;
+	timeout: number;
+}
+
 export interface Metal {
 	id: string;
 	percent: {
@@ -18,8 +23,6 @@ export interface Params {
 	tolerance: number;
 	min: number;
 	max: number;
-	count: number;
-	timeout: number;
 }
 
 export interface OreInfo {
@@ -45,4 +48,10 @@ export interface Result {
 	timedout: boolean;
 	time: number;
 
+}
+
+export interface Preset {
+	metals: Metal[];
+	ores: Ore[];
+	params: Params;
 }
