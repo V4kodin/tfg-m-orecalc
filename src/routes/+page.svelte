@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Metal, Ore, Params, Result, Settings } from "$lib/interfaces";
+	import type { Metal, Ore, Params, Result } from "$lib/interfaces";
 	import { preset, settings as settingsStore } from "$lib/stores";
-	import { generateAlloyCombinations } from "$lib/math";
+	import { generateAlloyCombinations, defaultQuantity } from "$lib/math";
 
-	import { Button, Input, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
+	import { Card, Button, Input, Select, Range, Label, Alert, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Toggle } from "flowbite-svelte";
 	import { TrashBinSolid, InfoCircleSolid, CloseCircleSolid } from "flowbite-svelte-icons";
 
 	let settings = $state($settingsStore);
@@ -27,7 +27,7 @@
 </script>
 
 <div class="grid grid-cols-3 divide-x h-full">
-	<div class="flex flex-col gap-6 p-8 overflow-y-auto">
+	<div class="flex flex-col gap-6 p-6 overflow-y-auto">
 		<h1 class="text-3xl font-bold">Requirements</h1>
 
 		<div class="flex w-full flex-col gap-4">
@@ -54,17 +54,15 @@
 			</div>
 		</div>
 	
-		Metal proportions
-	
-		<div class="flex w-full flex-col gap-4">
+		<div class="flex flex-col gap-4">
+			<span>Metal proportions</span>
 			<Button
 				onclick={() => metals = [...metals, { id: "", percent: { min: 0, max: 100 - metals.reduce((a, b) => a + b.percent.min, 0) } }]}
 			>
 				Add
 			</Button>
 			{#each metals as metal, i}
-			<!-- {#if i > 0}<Separator class="my-2"/>{/if} -->
-				<div class="flex flex-col gap-2">
+				<Card class="max-w-none p-4 flex flex-col gap-2">
 					<div class="flex flex-row gap-2">
 						<Input type="text" placeholder="Name" bind:value={metal.id} />
 						<Button
@@ -72,30 +70,31 @@
 							onclick={() => metals = metals.filter(r => r !== metal)}
 						><TrashBinSolid/></Button>
 					</div>
-					<div class="flex flex-col gap-2">
-						<Label>Min: {metal.percent.min}%</Label>
-						<Range bind:value={metal.percent.min} max={metal.percent.max} min={0} step={1}/>
+					<div class="flex flex-row gap-2 items-center">
+						<div class="flex flex-col gap-2 flex-1">
+							<Label>Min: {metal.percent.min}%</Label>
+							<Range bind:value={metal.percent.min} max={metal.percent.max} min={0} step={1}/>
+						</div>
+						<div class="flex flex-col gap-2 flex-1">
+							<Label>Max: {metal.percent.max}%</Label>
+							<Range bind:value={metal.percent.max} min={metal.percent.min} max={100 - metals.reduce((acc, v, k) => k === i ? acc : acc + v.percent.min, 0)} step={1}/>
+						</div>
 					</div>
-					<div class="flex flex-col gap-2">
-						<Label>Max: {metal.percent.max}%</Label>
-						<Range bind:value={metal.percent.max} min={metal.percent.min} max={100 - metals.reduce((acc, v, k) => k === i ? acc : acc + v.percent.min, 0)} step={1}/>
-					</div>
-				</div>
+				</Card>
 			{/each}
 		</div>
 	</div>
-	<div class="flex w-full flex-col gap-6 p-8 overflow-y-auto">
+	<div class="flex w-full flex-col gap-6 p-6 overflow-y-auto">
 		<h1 class="text-3xl font-bold">Ores</h1>
 
-		<div class="flex w-full flex-col gap-4">
+		<div class="flex flex-col gap-4">
 			<Button
 				onclick={() => ores = [...ores, { name: "", id: "", weight: 0, quantity: 0 }]}
 			>
 				Add
 			</Button>
-			{#each ores as ore, i}
-				<!-- {#if i > 0}<Separator class="my-2"/>{/if} -->
-				<div class="flex flex-col gap-2">
+			{#each ores as ore}
+				<Card class="max-w-none p-4 flex flex-col gap-2">
 					<div class="flex flex-row gap-2">
 						<Input type="text" placeholder="Name" bind:value={ore.name} />
 						<Button
@@ -104,34 +103,30 @@
 						><TrashBinSolid/></Button>
 					</div>
 					<div class="flex flex-row gap-2 items-center">
-						<Label class="text-sm text-nowrap">Quantity (optional)</Label>
-						<Input type="number" bind:value={ore.quantity} />
-						{#if ore.quantity}
-							<Button
-								color="alternative"
-								onclick={() => ore.quantity = 0}
-							><CloseCircleSolid/></Button>
-						{/if}
-					</div>
-
-					<div class="flex flex-col gap-2">
-						<!-- <span class="text-sm">Contains</span> -->
 						<Select
+							class="flex-3"
 							bind:value={ore.id}
 							disabled={metals.filter(r => Boolean(r.id)).length === 0}
 							items={metals.map(r => ({ value: r.id, name: r.id }))}
 							placeholder="Select containing component"
 						></Select>
-						<div class="flex flex-row gap-2 items-center">
-							<Input type="number" bind:value={ore.weight} />
-							<Label>mB</Label>
-						</div>
+						<Input class="flex-1" type="number" bind:value={ore.weight} />
+						<Label class="w-[60px] text-left">mB</Label>
 					</div>
-				</div>
+					<div class="flex flex-row gap-2 items-center">
+						<Input type="number" bind:value={ore.quantity} placeholder="Limit (optional, default: {defaultQuantity})"/>
+						{#if typeof ore.quantity === "number"}
+							<Button
+								color="alternative"
+								onclick={() => ore.quantity = void 0}
+							><CloseCircleSolid/></Button>
+						{/if}
+					</div>
+				</Card>
 			{/each}
 		</div>
 	</div>
-	<div class="flex w-full flex-col gap-6 p-8 overflow-y-auto">
+	<div class="flex w-full flex-col gap-6 p-6 overflow-y-auto">
 		<h1 class="text-3xl font-bold">Result</h1>
 
 		

@@ -13,7 +13,7 @@ export interface Metal {
 
 export interface Ore {
 	name: string;
-	quantity: number;
+	quantity?: number;
 	id: string;
 	weight: number;
 }

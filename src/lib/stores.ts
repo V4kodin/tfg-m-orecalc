@@ -33,3 +33,5 @@ export const settings = persisted<Settings>("settings", {
 });
 
 export const saved = persisted<Partial<Record<string, Preset>>>("saved", {});
+
+export const migrationMark = persisted<number>("migration-mark", 0);

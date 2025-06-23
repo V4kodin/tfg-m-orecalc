@@ -6,21 +6,32 @@
 	import { DarkMode, Button, Select, type SelectOptionType, Toast } from "flowbite-svelte";
 	import { GithubSolid, TrashBinSolid, ClipboardCheckSolid, CheckCircleSolid, CloseCircleSolid } from "flowbite-svelte-icons";
 
-	import { preset, saved, settings } from "$lib/stores";
+	import { migrationMark, preset, saved, settings } from "$lib/stores";
 	import type { Preset } from "$lib/interfaces";
 	
 	const { children } = $props()
 
-	const btnClass = "text-center font-medium bg-transparent border border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus-within:text-primary-700 dark:focus-within:text-white focus-within:ring-gray-200 dark:focus-within:ring-gray-700 focus-within:ring-4 focus-within:outline-hidden text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg text-xl p-2 h-[40px] w-[40px] flex items-center justify-center border-none";
-
-	// migration
-	{
+	// Mgrations
+	if ($migrationMark < 1) {
 		const old = $settings as unknown as Preset;
+
 		if (old.metals && old.ores && old.params) {
 			$preset = old;
 			settings.reset();
 		}
+
+		migrationMark.set(1);
 	}
+	if ($migrationMark < 2) {
+		const replace = (p: Preset) => (p.ores = p.ores.map(m => ({ ...m, quantity: m.quantity === 0 ? void 0 : m.quantity }))) && p;
+
+		$saved = Object.fromEntries(Object.entries($saved).map(([k, p]) => [k, p && replace(p)]));
+		replace($preset);
+
+		migrationMark.set(2);
+	}
+
+	const btnClass = "text-center font-medium bg-transparent border border-gray-200 dark:border-gray-600 dark:bg-gray-800 focus-within:text-primary-700 dark:focus-within:text-white focus-within:ring-gray-200 dark:focus-within:ring-gray-700 focus-within:ring-4 focus-within:outline-hidden text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg text-xl p-2 h-[40px] w-[40px] flex items-center justify-center border-none";
 
 	let list: SelectOptionType<string>[] = $state([]);
 	let selected: string = $state("");
