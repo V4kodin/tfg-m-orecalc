@@ -1,5 +1,7 @@
 import type { Combination, Metal, Ore, OreInfo, Params, Result, Settings } from "./interfaces"
 
+export const defaultQuantity = 32;
+
 function* product<T>(...pools: T[][]): Iterable<T[]> {
     const head = pools[0];
     const tail = pools.slice(1);
@@ -19,7 +21,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	const start = Date.now();
 	let timedout = false;
 
-	for (const quantities of product(...ores.map(ore => Array.from({ length: (ore.quantity || 64) + 1 }, (_, i) => i)))) {
+	for (const quantities of product(...ores.map(ore => Array.from({ length: (ore.quantity ?? defaultQuantity) + 1 }, (_, i) => i)))) {
 		if ((timedout = Date.now() - start > timeout * 1000) || validCombinations.length >= count)
 			break;
 
