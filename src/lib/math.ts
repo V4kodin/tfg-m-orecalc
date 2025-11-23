@@ -21,7 +21,23 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	const start = Date.now();
 	let timedout = false;
 
-	for (const quantities of product(...ores.map(ore => Array.from({ length: (ore.quantity ?? defaultQuantity) + 1 }, (_, i) => i)))) {
+	// Sort ores first by metal percentage and then by weight
+	const metalIndex = metals
+		.sort((a, b) => a.percent.min - b.percent.min)
+		.reduce((acc, v, k) => ({ ...acc, [v.id]: k }), {} as Record<string, number>);
+
+	const oresPrepared = ores
+		.sort((a , b) => 
+			metalIndex[b.id] - metalIndex[a.id] ||
+			b.weight - a.weight
+		)
+		.map(ore => ({ ...ore, quantity: ore.quantity ?? defaultQuantity }))
+		.filter(ore => ore.quantity > 0);
+
+	const oreQuantities = oresPrepared
+		.map(ore => Array.from({ length: (ore.quantity ?? defaultQuantity) + 1 }, (_, i) => i))
+
+	for (const quantities of product(...oreQuantities)) {
 		if ((timedout = Date.now() - start > timeout * 1000) || validCombinations.length >= count)
 			break;
 
@@ -32,7 +48,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 		if (totalQuantity == 0)
 			continue;
 
-		ores.forEach((ore, i) => {
+		oresPrepared.forEach((ore, i) => {
 			if (quantities[i] > 0) {
 				const weight = quantities[i] * ore.weight;
 				finalWeight += weight;
