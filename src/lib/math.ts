@@ -1,6 +1,5 @@
 import type { Combination, Metal, Ore, OreInfo, Params, Result, Settings } from "./interfaces"
 
-export const defaultQuantity = 32;
 const normalizeId = (value: string) => value.trim().toLowerCase();
 const getOreName = (ore: Ore) => ore.name?.trim() || "<unnamed ore>";
 const epsilon = 1e-9;
@@ -169,7 +168,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	if (invalidWeightOres.length > 0)
 		return fail(`Ores with non-positive weight: ${invalidWeightOres.join(", ")}`);
 
-	const zeroLimitOres = ores.filter(ore => (ore.quantity ?? defaultQuantity) <= 0).map(getOreName);
+	const zeroLimitOres = ores.filter(ore => typeof ore.quantity === "number" && ore.quantity <= 0).map(getOreName);
 	const cappedByMaxOres: string[] = [];
 
 	// Sort ores first by metal percentage and then by weight
@@ -184,14 +183,14 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 			b.weight - a.weight
 		)
 		.map(ore => {
-			const quantity = ore.quantity ?? defaultQuantity;
+			const quantity = ore.quantity ?? infinity;
 			const maxQtyByWeight = Math.floor(max / ore.weight);
 			const effectiveMaxQty = Math.min(quantity, Math.max(0, maxQtyByWeight));
 			if (quantity > 0 && effectiveMaxQty === 0)
 				cappedByMaxOres.push(getOreName(ore));
 			return { ...ore, quantity, effectiveMaxQty, metalIndex: metalIndexById[normalizeId(ore.id)] };
 		})
-		.filter(ore => ore.quantity > 0);
+		.filter(ore => ore.effectiveMaxQty > 0);
 
 	if (sortedOres.length === 0)
 		return fail(`No ores with quantity > 0. Ores with zero limit: ${zeroLimitOres.join(", ")}`);
