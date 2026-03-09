@@ -185,7 +185,7 @@
 			{:else}
 				<Alert color="red">
 					<InfoCircleSolid slot="icon" class="w-5 h-5" />
-					<span class="font-medium">No combinations (including approximate) found</span>
+					<span class="font-medium">{result.error ?? "No combinations (including approximate) found"}</span>
 				</Alert>
 			{/if}
 		{/if}
