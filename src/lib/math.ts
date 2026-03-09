@@ -4,6 +4,7 @@ export const defaultQuantity = 32;
 const normalizeId = (value: string) => value.trim().toLowerCase();
 const getOreName = (ore: Ore) => ore.name?.trim() || "<unnamed ore>";
 const epsilon = 1e-9;
+const infinity = Number.POSITIVE_INFINITY;
 
 const fail = (error: string): Result => ({
 	combinations: [],
@@ -12,6 +13,87 @@ const fail = (error: string): Result => ({
 	time: 0,
 	error
 });
+
+const distanceToNearestMultiple = (value: number, multipleOf: number): number => {
+	if (multipleOf <= 0)
+		return infinity;
+	const remainder = value % multipleOf;
+	if (remainder === 0)
+		return 0;
+	return Math.min(remainder, multipleOf - remainder);
+};
+
+const buildNoCombinationError = (input: {
+	rejectedByWeight: number;
+	rejectedByPercent: number;
+	rejectedByMultiple: number;
+	zeroLimitOres: string[];
+	cappedByMaxOres: string[];
+	metals: Metal[];
+	availableMetalWeight: number[];
+	minWeight: number;
+	multipleOf: number;
+	tolerance: number;
+	multipleCandidateCount: number;
+	multipleAllBelow: boolean;
+	minMultipleDistance: number;
+}): string => {
+	const {
+		rejectedByWeight,
+		rejectedByPercent,
+		rejectedByMultiple,
+		zeroLimitOres,
+		cappedByMaxOres,
+		metals,
+		availableMetalWeight,
+		minWeight,
+		multipleOf,
+		tolerance,
+		multipleCandidateCount,
+		multipleAllBelow,
+		minMultipleDistance
+	} = input;
+
+	let headline = "No combinations found";
+	if (rejectedByPercent >= rejectedByWeight && rejectedByPercent >= rejectedByMultiple && rejectedByPercent > 0)
+		headline = "No combinations match the configured metal percentage ranges";
+	else if (rejectedByWeight >= rejectedByPercent && rejectedByWeight >= rejectedByMultiple && rejectedByWeight > 0)
+		headline = "No combinations fit within Min/Max weight limits";
+	else if (rejectedByMultiple > 0)
+		headline = "No combinations match multiple/tolerance constraints";
+
+	const details: string[] = [];
+	if (zeroLimitOres.length > 0)
+		details.push(`ores with zero limit: ${zeroLimitOres.join(", ")}`);
+	if (cappedByMaxOres.length > 0)
+		details.push(`ignored by Max mB limit: ${cappedByMaxOres.join(", ")}`);
+
+	const shortage = metals
+		.map((metal, index) => {
+			if (metal.percent.min <= 0)
+				return "";
+			const requiredAtMin = (metal.percent.min / 100) * minWeight;
+			const available = availableMetalWeight[index];
+			if (available + epsilon < requiredAtMin)
+				return `${metal.id} needs >= ${requiredAtMin.toFixed(2)} mB at Min, available ${available.toFixed(2)} mB`;
+			return "";
+		})
+		.filter(Boolean);
+
+	if (shortage.length > 0)
+		details.push(`insufficient ore for required percentages: ${shortage.join("; ")}`);
+
+	if (multipleCandidateCount > 0) {
+		if (multipleAllBelow)
+			details.push(`all percentage-valid candidates are below Multiple of ${multipleOf} mB`);
+		else if (minMultipleDistance < infinity)
+			details.push(`closest candidate misses multiple by ${minMultipleDistance} mB (tolerance ${tolerance} mB)`);
+		if (tolerance <= 0)
+			details.push("approximation is disabled (tolerance = 0)");
+	}
+
+	return details.length > 0 ? `${headline}. Causes: ${details.join(". ")}` : headline;
+};
 
 function validateInput(metals: Metal[], params: Params): string | undefined {
 	const { multipleOf, min, max } = params;
@@ -118,6 +200,9 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	let rejectedByPercent = 0;
 	let rejectedByMultiple = 0;
 	let checked = 0;
+	let multipleCandidateCount = 0;
+	let multipleAllBelow = true;
+	let minMultipleDistance = infinity;
 
 	const oreCount = sortedOres.length;
 	const metalCount = metals.length;
@@ -132,6 +217,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 		suffixMetalMax[i] = [...suffixMetalMax[i + 1]];
 		suffixMetalMax[i][ore.metalIndex] += ore.weight * ore.effectiveMaxQty;
 	}
+	const availableMetalWeight = [...suffixMetalMax[0]];
 
 	const pushCombination = (finalWeight: number, valid: boolean) => {
 		const details: OreInfo[] = [];
@@ -223,9 +309,13 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 			}
 
 			const valid = currentWeight % multipleOf === 0;
-			const approximation = Math.abs(currentWeight - multipleOf) <= tolerance;
+			const multipleDistance = distanceToNearestMultiple(currentWeight, multipleOf);
+			const approximation = multipleDistance <= tolerance;
 			if (!valid && !approximation) {
 				rejectedByMultiple++;
+				multipleCandidateCount++;
+				multipleAllBelow = multipleAllBelow && currentWeight < multipleOf;
+				minMultipleDistance = Math.min(minMultipleDistance, multipleDistance);
 				return;
 			}
 
@@ -267,19 +357,24 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	if (combinations.length === 0) {
 		if (timedout)
 			error = "Calculation timed out before finding any matching combinations";
-		else if (rejectedByPercent > 0 && rejectedByPercent >= rejectedByWeight && rejectedByPercent >= rejectedByMultiple)
-			error = "No combinations match the configured metal percentage ranges";
-		else if (rejectedByWeight > 0 && rejectedByWeight >= rejectedByPercent && rejectedByWeight >= rejectedByMultiple)
-			error = "No combinations fit within Min/Max weight limits";
-		else if (rejectedByMultiple > 0)
-			error = "No combinations match multiple/tolerance constraints";
-		else if (checked === 0)
+		else if (checked === 0 && rejectedByWeight === 0 && rejectedByPercent === 0 && rejectedByMultiple === 0)
 			error = "No candidate combinations generated from current ore quantity limits";
-
-		if (error && zeroLimitOres.length > 0)
-			error = `${error}. Ores with zero limit: ${zeroLimitOres.join(", ")}`;
-		if (error && cappedByMaxOres.length > 0)
-			error = `${error}. Ignored by Max mB limit: ${cappedByMaxOres.join(", ")}`;
+		else
+			error = buildNoCombinationError({
+				rejectedByWeight,
+				rejectedByPercent,
+				rejectedByMultiple,
+				zeroLimitOres,
+				cappedByMaxOres,
+				metals,
+				availableMetalWeight,
+				minWeight: min,
+				multipleOf,
+				tolerance,
+				multipleCandidateCount,
+				multipleAllBelow,
+				minMultipleDistance
+			});
 	}
 
 	return {
