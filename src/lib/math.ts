@@ -2,6 +2,52 @@ import type { Combination, Metal, Ore, OreInfo, Params, Result, Settings } from 
 
 export const defaultQuantity = 32;
 const normalizeId = (value: string) => value.trim().toLowerCase();
+const getOreName = (ore: Ore) => ore.name?.trim() || "<unnamed ore>";
+
+const fail = (error: string): Result => ({
+	combinations: [],
+	approximation: false,
+	timedout: false,
+	time: 0,
+	error
+});
+
+function validateInput(metals: Metal[], params: Params): string | undefined {
+	const { multipleOf, min, max } = params;
+
+	if (multipleOf <= 0)
+		return "Multiple of must be greater than 0";
+	if (min > max)
+		return "Min mB cannot be greater than Max mB";
+	if (metals.length === 0)
+		return "No metals configured";
+
+	const unique = new Set<string>();
+	let sumMin = 0;
+	let sumMax = 0;
+
+	for (const metal of metals) {
+		const key = normalizeId(metal.id);
+		if (!key)
+			return "Metal id cannot be empty";
+		if (unique.has(key))
+			return `Duplicate metal id: ${metal.id}`;
+		unique.add(key);
+
+		if (metal.percent.min < 0 || metal.percent.max > 100 || metal.percent.min > metal.percent.max)
+			return `Invalid percentage range for metal ${metal.id}`;
+
+		sumMin += metal.percent.min;
+		sumMax += metal.percent.max;
+	}
+
+	if (sumMin > 100)
+		return `Invalid configuration: sum of minimum percentages is ${sumMin}% (> 100%)`;
+	if (sumMax < 100)
+		return `Invalid configuration: sum of maximum percentages is ${sumMax}% (< 100%)`;
+
+	return undefined;
+}
 
 function* product<T>(...pools: T[][]): Iterable<T[]> {
     const head = pools[0];
@@ -22,11 +68,12 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 	const start = Date.now();
 	let timedout = false;
 
-	if (metals.length === 0)
-		return { combinations: [], approximation: false, timedout: false, time: 0, error: "No metals configured" };
+	const inputError = validateInput(metals, params);
+	if (inputError)
+		return fail(inputError);
 
 	if (ores.length === 0)
-		return { combinations: [], approximation: false, timedout: false, time: 0, error: "No ores configured" };
+		return fail("No ores configured");
 
 	const metalById = metals.reduce((acc, metal) => {
 		acc[normalizeId(metal.id)] = metal;
@@ -35,16 +82,16 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 
 	const unresolvedOres = ores
 		.filter(ore => !metalById[normalizeId(ore.id)])
-		.map(ore => ore.name || "<unnamed ore>");
+		.map(getOreName);
 
 	if (unresolvedOres.length > 0)
-		return {
-			combinations: [],
-			approximation: false,
-			timedout: false,
-			time: 0,
-			error: `Ores with unknown metal id: ${unresolvedOres.join(", ")}`
-		};
+		return fail(`Ores with unknown metal id: ${unresolvedOres.join(", ")}`);
+
+	const invalidWeightOres = ores.filter(ore => ore.weight <= 0).map(getOreName);
+	if (invalidWeightOres.length > 0)
+		return fail(`Ores with non-positive weight: ${invalidWeightOres.join(", ")}`);
+
+	const zeroLimitOres = ores.filter(ore => (ore.quantity ?? defaultQuantity) <= 0).map(getOreName);
 
 	// Sort ores first by metal percentage and then by weight
 	const sortedMetals = [...metals]
@@ -61,7 +108,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 		.filter(ore => ore.quantity > 0);
 
 	if (sortedOres.length === 0)
-		return { combinations: [], approximation: false, timedout: false, time: 0, error: "No ores with quantity > 0" };
+		return fail(`No ores with quantity > 0. Ores with zero limit: ${zeroLimitOres.join(", ")}`);
 
 	const oreQuantities = sortedOres
 		.map(ore => Array.from({ length: (ore.quantity ?? defaultQuantity) + 1 }, (_, i) => i))
@@ -152,6 +199,9 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 			error = "No combinations match multiple/tolerance constraints";
 		else if (checked === 0)
 			error = "No candidate combinations generated from current ore quantity limits";
+
+		if (error && zeroLimitOres.length > 0)
+			error = `${error}. Ores with zero limit: ${zeroLimitOres.join(", ")}`;
 	}
 
 	return {
