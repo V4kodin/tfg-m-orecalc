@@ -92,6 +92,7 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 		return fail(`Ores with non-positive weight: ${invalidWeightOres.join(", ")}`);
 
 	const zeroLimitOres = ores.filter(ore => (ore.quantity ?? defaultQuantity) <= 0).map(getOreName);
+	const cappedByMaxOres: string[] = [];
 
 	// Sort ores first by metal percentage and then by weight
 	const sortedMetals = [...metals]
@@ -104,14 +105,21 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 			sortedMetals[normalizeId(a.id)] - sortedMetals[normalizeId(b.id)] ||
 			b.weight - a.weight
 		)
-		.map(ore => ({ ...ore, quantity: ore.quantity ?? defaultQuantity }))
+		.map(ore => {
+			const quantity = ore.quantity ?? defaultQuantity;
+			const maxQtyByWeight = Math.floor(max / ore.weight);
+			const effectiveMaxQty = Math.min(quantity, Math.max(0, maxQtyByWeight));
+			if (quantity > 0 && effectiveMaxQty === 0)
+				cappedByMaxOres.push(getOreName(ore));
+			return { ...ore, quantity, effectiveMaxQty };
+		})
 		.filter(ore => ore.quantity > 0);
 
 	if (sortedOres.length === 0)
 		return fail(`No ores with quantity > 0. Ores with zero limit: ${zeroLimitOres.join(", ")}`);
 
 	const oreQuantities = sortedOres
-		.map(ore => Array.from({ length: (ore.quantity ?? defaultQuantity) + 1 }, (_, i) => i))
+		.map(ore => Array.from({ length: ore.effectiveMaxQty + 1 }, (_, i) => i))
 
 	let rejectedByWeight = 0;
 	let rejectedByPercent = 0;
@@ -202,6 +210,8 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 
 		if (error && zeroLimitOres.length > 0)
 			error = `${error}. Ores with zero limit: ${zeroLimitOres.join(", ")}`;
+		if (error && cappedByMaxOres.length > 0)
+			error = `${error}. Ignored by Max mB limit: ${cappedByMaxOres.join(", ")}`;
 	}
 
 	return {
