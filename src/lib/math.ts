@@ -3,6 +3,7 @@ import type { Combination, Metal, Ore, OreInfo, Params, Result, Settings } from 
 export const defaultQuantity = 32;
 const normalizeId = (value: string) => value.trim().toLowerCase();
 const getOreName = (ore: Ore) => ore.name?.trim() || "<unnamed ore>";
+const epsilon = 1e-9;
 
 const fail = (error: string): Result => ({
 	combinations: [],
@@ -49,15 +50,6 @@ function validateInput(metals: Metal[], params: Params): string | undefined {
 	return undefined;
 }
 
-function* product<T>(...pools: T[][]): Iterable<T[]> {
-    const head = pools[0];
-    const tail = pools.slice(1);
-    const remainder = tail.length > 0 ? product(...tail) : [[]];
-    for (let r of remainder)
-		for (let h of head)
-			yield [h, ...r];
-}
-
 export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: Params, settings: Settings): Result {
 	const { multipleOf, tolerance, min, max } = params;
 	const { count, timeout } = settings;
@@ -79,6 +71,10 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 		acc[normalizeId(metal.id)] = metal;
 		return acc;
 	}, {} as Record<string, Metal>);
+	const metalIndexById = metals.reduce((acc, metal, index) => {
+		acc[normalizeId(metal.id)] = index;
+		return acc;
+	}, {} as Record<string, number>);
 
 	const unresolvedOres = ores
 		.filter(ore => !metalById[normalizeId(ore.id)])
@@ -111,73 +107,44 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 			const effectiveMaxQty = Math.min(quantity, Math.max(0, maxQtyByWeight));
 			if (quantity > 0 && effectiveMaxQty === 0)
 				cappedByMaxOres.push(getOreName(ore));
-			return { ...ore, quantity, effectiveMaxQty };
+			return { ...ore, quantity, effectiveMaxQty, metalIndex: metalIndexById[normalizeId(ore.id)] };
 		})
 		.filter(ore => ore.quantity > 0);
 
 	if (sortedOres.length === 0)
 		return fail(`No ores with quantity > 0. Ores with zero limit: ${zeroLimitOres.join(", ")}`);
 
-	const oreQuantities = sortedOres
-		.map(ore => Array.from({ length: ore.effectiveMaxQty + 1 }, (_, i) => i))
-
 	let rejectedByWeight = 0;
 	let rejectedByPercent = 0;
 	let rejectedByMultiple = 0;
 	let checked = 0;
 
-	for (const quantities of product(...oreQuantities)) {
-		if ((timedout = Date.now() - start > timeout * 1000) || validCombinations.length >= count)
-			break;
+	const oreCount = sortedOres.length;
+	const metalCount = metals.length;
+	const quantities = new Array<number>(oreCount).fill(0);
+	const metalWeights = new Array<number>(metalCount).fill(0);
 
-		let finalWeight = 0;
-		const totalQuantity = quantities.reduce((acc, val) => acc + val, 0);
+	const suffixMaxWeight = new Array<number>(oreCount + 1).fill(0);
+	const suffixMetalMax = Array.from({ length: oreCount + 1 }, () => new Array<number>(metalCount).fill(0));
+	for (let i = oreCount - 1; i >= 0; i--) {
+		const ore = sortedOres[i];
+		suffixMaxWeight[i] = suffixMaxWeight[i + 1] + ore.weight * ore.effectiveMaxQty;
+		suffixMetalMax[i] = [...suffixMetalMax[i + 1]];
+		suffixMetalMax[i][ore.metalIndex] += ore.weight * ore.effectiveMaxQty;
+	}
+
+	const pushCombination = (finalWeight: number, valid: boolean) => {
 		const details: OreInfo[] = [];
-
-		if (totalQuantity == 0)
-			continue;
-
-		sortedOres.forEach((ore, i) => {
-			if (quantities[i] > 0) {
-				const weight = quantities[i] * ore.weight;
-				finalWeight += weight;
-				details.push({ id: ore.id, name: ore.name, weight, quantity: quantities[i] });
-			}
-		});
-
-		if (finalWeight < min || finalWeight > max)
-		{
-			rejectedByWeight++;
-			continue;
+		for (let i = 0; i < oreCount; i++) {
+			if (quantities[i] <= 0)
+				continue;
+			details.push({
+				id: sortedOres[i].id,
+				name: sortedOres[i].name,
+				weight: quantities[i] * sortedOres[i].weight,
+				quantity: quantities[i]
+			});
 		}
-
-		let percentagesMet = true;
-		metals.forEach((metal) => {
-			const metalWeight = details
-				.filter(w => w.id === metal.id)
-				.reduce((acc, val) => acc + val.weight, 0);
-			const percentage = (metalWeight / finalWeight) * 100;
-
-			if (!(metal.percent.min <= percentage && percentage <= metal.percent.max))
-				percentagesMet = false;
-		});
-
-		if (!percentagesMet)
-		{
-			rejectedByPercent++;
-			continue;
-		}
-
-		const valid = finalWeight % multipleOf === 0 && finalWeight > 0;
-		const approximation = Math.abs(finalWeight - multipleOf) <= tolerance && finalWeight > 0;
-		
-		if (!valid && !approximation)
-		{
-			rejectedByMultiple++;
-			continue;
-		}
-
-		checked++;
 
 		(valid ? validCombinations : approximationCombinations).push({
 			details,
@@ -188,7 +155,108 @@ export function generateAlloyCombinations(metals: Metal[], ores: Ore[], params: 
 				multipleOf
 			}
 		});
-	}
+	};
+
+	const dfs = (index: number, currentWeight: number) => {
+		if (timedout || validCombinations.length >= count)
+			return;
+		if (Date.now() - start > timeout * 1000) {
+			timedout = true;
+			return;
+		}
+
+		if (currentWeight > max) {
+			rejectedByWeight++;
+			return;
+		}
+
+		const maxReachableWeight = currentWeight + suffixMaxWeight[index];
+		if (maxReachableWeight < min) {
+			rejectedByWeight++;
+			return;
+		}
+
+		const possibleWeightMin = Math.max(min, currentWeight);
+		const possibleWeightMax = Math.min(max, maxReachableWeight);
+
+		for (let metalIndex = 0; metalIndex < metalCount; metalIndex++) {
+			const currentMetalWeight = metalWeights[metalIndex];
+			const maxMetalWeight = currentMetalWeight + suffixMetalMax[index][metalIndex];
+			const minPercent = metals[metalIndex].percent.min;
+			const maxPercent = metals[metalIndex].percent.max;
+
+			if (minPercent > 0) {
+				const maxWeightForMinConstraint = (maxMetalWeight * 100) / minPercent;
+				if (possibleWeightMin - epsilon > maxWeightForMinConstraint) {
+					rejectedByPercent++;
+					return;
+				}
+			}
+
+			if (maxPercent <= 0) {
+				if (currentMetalWeight > 0) {
+					rejectedByPercent++;
+					return;
+				}
+			} else {
+				const minWeightForMaxConstraint = (currentMetalWeight * 100) / maxPercent;
+				if (possibleWeightMax + epsilon < minWeightForMaxConstraint) {
+					rejectedByPercent++;
+					return;
+				}
+			}
+		}
+
+		if (index === oreCount) {
+			if (currentWeight <= 0 || currentWeight < min || currentWeight > max) {
+				rejectedByWeight++;
+				return;
+			}
+
+			for (let metalIndex = 0; metalIndex < metalCount; metalIndex++) {
+				const percentage = (metalWeights[metalIndex] / currentWeight) * 100;
+				const range = metals[metalIndex].percent;
+				if (percentage + epsilon < range.min || percentage - epsilon > range.max) {
+					rejectedByPercent++;
+					return;
+				}
+			}
+
+			const valid = currentWeight % multipleOf === 0;
+			const approximation = Math.abs(currentWeight - multipleOf) <= tolerance;
+			if (!valid && !approximation) {
+				rejectedByMultiple++;
+				return;
+			}
+
+			checked++;
+			pushCombination(currentWeight, valid);
+			return;
+		}
+
+		const ore = sortedOres[index];
+		for (let qty = ore.effectiveMaxQty; qty >= 0; qty--) {
+			const addedWeight = qty * ore.weight;
+			const nextWeight = currentWeight + addedWeight;
+			if (nextWeight > max)
+				continue;
+
+			quantities[index] = qty;
+			if (qty > 0)
+				metalWeights[ore.metalIndex] += addedWeight;
+
+			dfs(index + 1, nextWeight);
+
+			if (qty > 0)
+				metalWeights[ore.metalIndex] -= addedWeight;
+			quantities[index] = 0;
+
+			if (timedout || validCombinations.length >= count)
+				break;
+		}
+	};
+
+	dfs(0, 0);
 
 	const hasValid = validCombinations.length > 0;
 	const combinations = hasValid
